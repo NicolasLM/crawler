@@ -72,7 +72,7 @@ def get_domain_info(domain):
         country = get_country_from_ip(ip)
     except socket.gaierror:
         asn = None
-        country = none
+        country = None
 
     return DomainInfo(
         name=domain,
