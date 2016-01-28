@@ -126,7 +126,7 @@ def crawl_domain(domain):
 
     # Create a task for each domain not seen yet
     for linked_domain in domain_info.linked_domains:
-        if r.table('domains').get_all(linked_domain, index='name'}).count().run(conn):
+        if r.table('domains').get_all(linked_domain, index='name').count().run(conn):
             continue
         crawl_domain.delay(linked_domain)
 
