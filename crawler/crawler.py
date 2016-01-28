@@ -59,12 +59,12 @@ def get_domain_info(domain):
     if 'text/html' not in response.headers.get('Content-Type', ''):
         raise UncrawlableDomain('Cannot crawl ' + domain)
     
-    domains = list()
+    domains = set()
     soup = BeautifulSoup(response.content, 'html.parser')
     for link in soup.find_all('a'):
         parsed_link = urlparse(link.get('href'))
-        if parsed_link.netloc:
-            domains.append(parsed_link.netloc.lower())
+        if parsed_link.netloc and parsed_link.netloc.lower() != domain:
+            domains.add(parsed_link.netloc.lower())
 
     try:
         ip = socket.gethostbyname(domain)
@@ -78,7 +78,7 @@ def get_domain_info(domain):
         name=domain,
         elapsed=round(response.elapsed.microseconds / 1000),
         headers=response.headers,
-        linked_domains=set(domains),
+        linked_domains=domains,
         asn=asn,
         country=country
     )
@@ -115,7 +115,7 @@ def crawl_domain(domain):
                      db=conf.RethinkDBConf.DB)
 
     # Do not process already crawled domains
-    if r.table('domains').filter({'name': domain}).count().run(conn):
+    if r.table('domains').get_all(domain, index='name').count().run(conn):
         return
 
     try:
@@ -126,7 +126,7 @@ def crawl_domain(domain):
 
     # Create a task for each domain not seen yet
     for linked_domain in domain_info.linked_domains:
-        if r.table('domains').filter({'name': linked_domain}).count().run(conn):
+        if r.table('domains').get_all(linked_domain, index='name'}).count().run(conn):
             continue
         crawl_domain.delay(linked_domain)
 
