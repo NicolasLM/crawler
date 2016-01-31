@@ -126,3 +126,36 @@ def rethinkdb():
         click.secho('Created index domains.name', fg='yellow')
     except ReqlRuntimeError:
         click.secho('Index domains.name already exists', fg='green')
+
+
+@cli.command('duplicate', short_help='remove duplicated tasks')
+def duplicate():
+    """Remove duplicated scheduled tasks"""
+    import json
+    import base64
+
+    from .crawler import app
+
+    redis_url = urlparse(conf.CeleryConf.BROKER_URL)
+    redis_conn = redis.StrictRedis(redis_url.hostname,
+                                   port=redis_url.port,
+                                   db=redis_url.path[1:])
+    num_tasks = redis_conn.llen('celery')
+    if not num_tasks:
+        return
+
+    scheduled_tasks = set()
+    task_position = 0
+    for i in range(num_tasks):
+        print(i, task_position)
+        task = json.loads(redis_conn.lindex('celery', task_position).decode())
+        task_body = json.loads(base64.b64decode(task['body']).decode())
+        task_domain = task_body['args'][0]
+
+        if not task_domain in scheduled_tasks:
+            scheduled_tasks.add(task_domain)
+            task_position += 1
+        else:
+            redis_conn.ltrim('celery', task_position, task_position)
+            click.secho('Removed duplicated {}'.format(task_domain),
+                        fg='yellow')
